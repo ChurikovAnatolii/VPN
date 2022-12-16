@@ -1,0 +1,92 @@
+---
+- name: server config
+  hosts: server
+  become: yes
+  vars_files: defaults/main.yml
+  tasks:
+  - name: install tools
+    yum:
+      name:
+        - epel-release
+        - iperf3
+      state: present
+      update_cache: true
+
+  - name: install openvpn
+    yum:
+      name: openvpn
+      state: present
+
+  - name: generate static key
+    shell: openvpn --genkey --secret /etc/openvpn/static.key
+  
+  - name: fetch static key
+    fetch:
+      src: /etc/openvpn/static.key
+      dest: tmp/
+      flat: yes
+  
+  - name: copy server conf
+    template:
+      src: templates/server.conf.j2
+      dest: /etc/openvpn/server.conf
+    notify:
+      - restart openvpn-server
+
+  - name: start server VPN
+    service:
+      name: openvpn@server
+      state: started
+      enabled: yes
+
+  handlers:
+  - name: restart openvpn-server
+    service:
+      name: openvpn@server
+      state: restarted
+
+- name: client config
+  hosts: client
+  become: yes
+  vars_files: defaults/main.yml
+  tasks:
+  - name: install tools
+    yum:
+      name:
+        - epel-release
+        - iperf3
+      state: present
+      update_cache: true
+  
+  - name: install openvpn
+    yum:
+      name: openvpn
+      state: present
+
+  - name: copy client conf
+    template:
+      src: templates/server.conf.j2
+      dest: /etc/openvpn/server.conf
+    notify:
+      - restart openvpn-server
+
+  - name: copy static.key
+    template:
+      src: tmp/static.key
+      dest: /etc/openvpn/static.key
+
+  - name: start client VPN
+    service:
+      name: openvpn@server
+      state: started
+      enabled: yes
+
+  handlers:
+    - name: restart openvpn-server
+      service:
+        name: openvpn@server
+        state: restarted
+
+
+
+
